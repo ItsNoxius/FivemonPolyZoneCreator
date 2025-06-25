@@ -109,23 +109,19 @@
 
         <button
             class="btn btn-debug"
-            onclick="debug = !debug;this.style.backgroundColor = debug ? '#40aa40' : '#303030';"
+            onclick="debug = !debug;this.style.backgroundColor = debug ? '#40aa40' : '#303030';updateUrlState();"
         >
             Debug Grid
         </button>
 
         <button
             class="btn btn-overlay"
-            onclick="overlay = !overlay;this.style.backgroundColor = overlay ? '#40aa40' : '#303030';setOverlay();"
+            onclick="overlay = !overlay;this.style.backgroundColor = overlay ? '#40aa40' : '#303030';setOverlay();updateUrlState();"
         >
             Overlay Grid
         </button>
 
         <div id="controls">
-            <!-- <button onclick="saveConfiguration()">Save</button>
-    <select id="savedList" onchange="loadConfiguration(this.value)">
-      <option value="">-- Load Saved --</option>
-    </select><br /><br /> -->
             <button onclick="exportZones()">Export JSON</button>
             <button onclick="importZones()">Import JSON</button>
             <br />
@@ -163,6 +159,48 @@
             var bounds = [bottomLeft, topRight];
 
             var zonesList = []; // global array to track zones
+
+            // Load state from URL params if present
+            function loadStateFromUrl() {
+                const params = new URLSearchParams(window.location.search);
+                const state = params.get("state");
+                if (state) {
+                    try {
+                        const decodedState = JSON.parse(atob(state));
+                        debug = decodedState.debug;
+                        overlay = decodedState.overlay;
+                        zonesList = decodedState.zones;
+
+                        // Update UI to match loaded state
+                        document.querySelector(
+                            ".btn-debug"
+                        ).style.backgroundColor = debug ? "#40aa40" : "#303030";
+                        document.querySelector(
+                            ".btn-overlay"
+                        ).style.backgroundColor = overlay
+                            ? "#40aa40"
+                            : "#303030";
+                        setOverlay();
+
+                        // Load zones
+                        zonesList.forEach((zone) => loadSavedZone(zone));
+                    } catch (e) {
+                        console.error("Failed to load state from URL:", e);
+                    }
+                }
+            }
+
+            // Update URL with current state
+            function updateUrlState() {
+                const state = {
+                    debug,
+                    overlay,
+                    zones: zonesList,
+                };
+                const stateStr = btoa(JSON.stringify(state));
+                const newUrl = `${window.location.pathname}?state=${stateStr}`;
+                window.history.pushState({}, "", newUrl);
+            }
 
             L.Draw.Circle = L.Draw.SimpleShape.extend({
                 statics: {
@@ -390,7 +428,7 @@
                     .forEach((layer) => editableLayers.removeLayer(layer));
 
                 zonesList = []; // Clear the zones list
-                localStorage.removeItem("zones"); // Remove zones from localStorage
+                updateUrlState(); // Update URL after clearing
             }
 
             //https://github.com/mkafrin/PolyZone/blob/master/server.lua
@@ -529,8 +567,7 @@
                     };
 
                     zonesList.push(zone);
-                    // Save updated zonesList to localStorage
-                    saveZonesIntoLocalStorage(zonesList);
+                    updateUrlState(); // Update URL after adding zone
 
                     let content = parseShape2(zone);
                     const popupContent = setupPopupContent(content, zone);
@@ -633,7 +670,7 @@
                         };
                         zonesList[zoneInListIndex] = zone;
 
-                        saveZonesIntoLocalStorage(zonesList);
+                        updateUrlState(); // Update URL after editing zone
 
                         const popupContent = setupPopupContent(content, zone);
 
@@ -657,37 +694,6 @@
 
             //Center the map
             //map.setView(xy(0, 0), 3);
-
-            function saveZonesIntoLocalStorage(zones) {
-                if (!zones || zones.length === 0) {
-                    console.warn("No zones to save!");
-                    return;
-                }
-
-                // Save the zones to localStorage
-                localStorage.setItem("zones", JSON.stringify(zones));
-                zonesList = zones; // Update the global zonesList variable
-                console.log(zones.length + " zone(s) saved to localStorage.");
-            }
-
-            // Load saved zones from localStorage (if any)
-            function loadZonesFromLocalStorage() {
-                const savedZones = localStorage.getItem("zones");
-                if (savedZones) {
-                    try {
-                        zonesList = JSON.parse(savedZones);
-                    } catch (e) {
-                        console.error("Failed to parse saved zones JSON.", e);
-                        zonesList = [];
-                    }
-                    // Draw each saved zone on the map
-                    zonesList.forEach((zone) => loadSavedZone(zone));
-
-                    console.log(
-                        zonesList.length + " zone(s) loaded from localStorage."
-                    );
-                }
-            }
 
             function exportZones() {
                 if (!zonesList || zonesList.length === 0) {
@@ -747,7 +753,8 @@
                     };
                 });
 
-                saveZonesIntoLocalStorage(zones);
+                zonesList = zones;
+                updateUrlState(); // Update URL after importing zones
                 alert(importedZones.length + " zone(s) imported successfully.");
             }
 
@@ -812,18 +819,17 @@
                     return oldContent;
                 }
 
-                // console.log("Zones after edit:", zonesList);
-
                 popupContent.innerText = newContent;
                 layer.getPopup().setContent(popupContent);
 
                 zonesList[zoneInListIndex] = zoneAfterEdit;
-                saveZonesIntoLocalStorage(zonesList);
+                updateUrlState(); // Update URL after editing zone metadata
 
-                return newContent; // Update oldContent variable to new content
+                return newContent;
             }
 
-            loadZonesFromLocalStorage();
+            // Load initial state from URL if present
+            loadStateFromUrl();
         </script>
     </body>
 </html>
