@@ -91,6 +91,12 @@
                 border-radius: 4px;
                 font-family: sans-serif;
             }
+
+            #jsonTextArea {
+                width: 300px;
+                height: 100px;
+                margin: 5px 0;
+            }
         </style>
     </head>
 
@@ -121,17 +127,12 @@
       <option value="">-- Load Saved --</option>
     </select><br /><br /> -->
             <button onclick="exportZones()">Export JSON</button>
-
-            <input
-                type="file"
-                id="zoneFileInput"
-                accept=".json"
-                style="display: none"
-                onchange="importZones(this.files[0])"
-            />
-            <button onclick="document.getElementById('zoneFileInput').click()">
-                Import JSON
-            </button>
+            <button onclick="importZones()">Import JSON</button>
+            <br />
+            <textarea
+                id="jsonTextArea"
+                placeholder="Paste JSON here to import or copy exported JSON"
+            ></textarea>
         </div>
 
         <script
@@ -694,70 +695,60 @@
                     return;
                 }
 
-                // console.log("Zones to export:", zonesList);
-                // Prepare data string
-                const jsonStr = JSON.stringify(zonesList, null, 4); // formatted with 4-space indent
-                // Create a blob and trigger download
-                const blob = new Blob([jsonStr], { type: "application/json" });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement("a");
-                link.href = url;
-                link.download = "zones.json";
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
+                const jsonStr = JSON.stringify(zonesList, null, 4);
+                document.getElementById("jsonTextArea").value = jsonStr;
+                document.getElementById("jsonTextArea").select();
+                document.execCommand("copy");
+                alert("Zones exported to textarea and copied to clipboard!");
             }
 
-            function importZones(file) {
-                if (!file) return;
-                const reader = new FileReader();
+            function importZones() {
+                const jsonStr = document.getElementById("jsonTextArea").value;
+                if (!jsonStr) {
+                    alert("Please paste JSON into the textarea first!");
+                    return;
+                }
 
-                reader.onload = function (event) {
-                    let importedZones;
+                let importedZones;
+                try {
+                    importedZones = JSON.parse(jsonStr);
+                } catch (err) {
+                    alert("Invalid JSON format.");
+                    return;
+                }
 
-                    try {
-                        importedZones = JSON.parse(event.target.result);
-                    } catch (err) {
-                        alert("Invalid JSON file format.");
-                        return;
-                    }
-
-                    if (!Array.isArray(importedZones)) {
-                        alert(
-                            "Invalid JSON: root element should be an array of zones."
-                        );
-                        return;
-                    }
-                    // Clear current shapes (optional: or merge instead of replace)
-                    editableLayers.clearLayers();
-
-                    zones = importedZones.map((zone) => {
-                        loadSavedZone(zone);
-
-                        return {
-                            ...zone,
-                            name: zone.name || "unnamed",
-                            points: zone.points,
-                            options: {
-                                minZ: zone.options?.minZ || 0,
-                                maxZ: zone.options?.maxZ || 800.0,
-                                web: {
-                                    type: zone.options?.web?.type || "polygon",
-                                    debugColor:
-                                        zone.options?.web?.debugColor ||
-                                        "rgb(51, 136, 255)",
-                                },
-                            },
-                        };
-                    });
-
-                    saveZonesIntoLocalStorage(zones);
+                if (!Array.isArray(importedZones)) {
                     alert(
-                        importedZones.length + " zone(s) imported successfully."
+                        "Invalid JSON: root element should be an array of zones."
                     );
-                };
-                reader.readAsText(file);
+                    return;
+                }
+
+                // Clear current shapes
+                editableLayers.clearLayers();
+
+                zones = importedZones.map((zone) => {
+                    loadSavedZone(zone);
+
+                    return {
+                        ...zone,
+                        name: zone.name || "unnamed",
+                        points: zone.points,
+                        options: {
+                            minZ: zone.options?.minZ || 0,
+                            maxZ: zone.options?.maxZ || 800.0,
+                            web: {
+                                type: zone.options?.web?.type || "polygon",
+                                debugColor:
+                                    zone.options?.web?.debugColor ||
+                                    "rgb(51, 136, 255)",
+                            },
+                        },
+                    };
+                });
+
+                saveZonesIntoLocalStorage(zones);
+                alert(importedZones.length + " zone(s) imported successfully.");
             }
 
             function loadSavedZone(zone) {
