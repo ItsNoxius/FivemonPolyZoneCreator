@@ -373,7 +373,7 @@
             function latlngToGTA(latlng) {
                 var x = (latlng.lng - mapCenterLng) / gtaOffset;
                 var y = (latlng.lat - mapCenterLat) / gtaOffset;
-                return [x.toFixed(2), y.toFixed(2)];
+                return [x, y];
             }
 
             // Convert GTA coords to latlng on the map (inverse of latlngToGTA)
@@ -694,6 +694,14 @@
                     alert("No zones to export!");
                     return;
                 }
+
+                zonesList = zonesList.map((zone) => ({
+                    ...zone,
+                    points: zone.points.map((point) => ({
+                        x: parseInt(point.x * 100) / 100,
+                        y: parseInt(point.y * 100) / 100,
+                    })),
+                }));
 
                 const jsonStr = JSON.stringify(zonesList, null, 4);
                 document.getElementById("jsonTextArea").value = jsonStr;
